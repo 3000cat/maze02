@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>程式迷宮大挑戰</title>
+  
+  <!-- 載入 Tailwind CSS (用來美化畫面) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 載入 React 核心庫 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- 載入 Babel (用來讓瀏覽器看懂 React 語法) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-sky-100">
+  <!-- 這是 React 程式掛載的地方 -->
+  <div id="root"></div>
+
+  <!-- React 應用程式碼開始 -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      // 這是您的 Google Apps Script 網址 (從您原本的程式碼中擷取)
+      const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycby5RhJtjVSj344ioRjo425I6HI8Bh0_HyCRE7RqdfHrpGTIz06wKexT8w4mF0x-0jGb/exec";
+
+      const [gameState, setGameState] = useState('login'); // 'login', 'playing', 'finished'
+      const [student, setStudent] = useState({ className: '', seat: '', name: '' });
+      const [currentLevel, setCurrentLevel] = useState(1);
+      const [score, setScore] = useState(0);
+      const [isSaving, setIsSaving] = useState(false);
+
+      // 處理學生輸入資料
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setStudent({ ...student, [name]: value });
+      };
+
+      // 開始遊戲
+      const startGame = (e) => {
+        e.preventDefault();
+        if (!student.className || !student.seat || !student.name) {
+          alert("小朋友，請把班級、座號和姓名都填寫完整喔！");
+          return;
+        }
+        setGameState('playing');
+      };
+
+      // 紀錄成績到 Google 雲端試算表
+      const saveToGoogleSheet = async (levelCompleted, currentScore) => {
+        setIsSaving(true);
+        const data = {
+          className: student.className,
+          seat: student.seat,
+          name: student.name,
+          level: levelCompleted,
+          score: currentScore
+        };
+
+        try {
+          await fetch(GOOGLE_SHEET_URL, {
+            method: 'POST',
+            // 使用 text/plain 避免跨網域 CORS 的 preflight 問題
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(data)
+          });
+        } catch (error) {
+          console.error("儲存成績失敗：", error);
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
+      // 學生點擊過關
+      const handleLevelComplete = () => {
+        const newScore = currentLevel * 10;
+        setScore(newScore);
+        
+        // 儲存當前進度到試算表
+        saveToGoogleSheet(currentLevel, newScore);
+
+        if (currentLevel < 10) {
+          setCurrentLevel(currentLevel + 1);
+        } else {
+          setGameState('finished');
+        }
+      };
+
+      return (
+        <div className="min-h-screen font-sans text-gray-800 flex flex-col items-center">
+          {/* 頂部標題列 */}
+          <header className="w-full bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-10">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <span>🧩</span> 程式迷宮大挑戰
+            </h1>
+            {gameState !== 'login' && (
+              <div className="flex gap-4 items-center bg-blue-700 px-4 py-2 rounded-full border-2 border-yellow-400">
+                <span className="font-semibold">
+                  🧑‍🎓 {student.className}班 {student.seat}號 {student.name}
+                </span>
+                <span className="text-yellow-300 font-bold">
+                  🏆 分數：{score} 分
+                </span>
+              </div>
+            )}
+          </header>
+
+          {/* 登入畫面 */}
+          {gameState === 'login' && (
+            <div className="flex-grow flex items-center justify-center p-4 w-full">
+              <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border-t-8 border-blue-500">
+                <div className="text-center mb-6">
+                  <div className="text-6xl mb-4">🏫</div>
+                  <h2 className="text-3xl font-bold text-gray-800">小神童報到區</h2>
+                  <p className="text-gray-500 mt-2">準備好挑戰 10 關的程式迷宮了嗎？<br/>一關 10 分，只能乖乖破關不能跳級喔！</p>
+                </div>
+                
+                <form onSubmit={startGame} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-2">🎈 你的班級</label>
+                    <input type="text" name="className" value={student.className} onChange={handleInputChange} 
+                      placeholder="例如：三年一班" 
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-lg" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-2">🔢 你的座號</label>
+                    <input type="number" name="seat" value={student.seat} onChange={handleInputChange} 
+                      placeholder="例如：15" 
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-lg" />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-2">📝 你的姓名</label>
+                    <input type="text" name="name" value={student.name} onChange={handleInputChange} 
+                      placeholder="例如：王小明" 
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none text-lg" />
+                  </div>
+                  
+                  <button type="submit" 
+                    className="w-full mt-6 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-4 rounded-xl text-xl shadow-lg transform transition hover:scale-105">
+                    出發！開始挑戰 🚀
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 遊戲畫面 */}
+          {gameState === 'playing' && (
+            <div className="flex-grow w-full max-w-6xl p-4 flex flex-col gap-4">
+              {/* 關卡資訊與過關按鈕 */}
+              <div className="bg-white p-4 rounded-2xl shadow-md flex flex-wrap justify-between items-center border-l-8 border-green-500">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    🚩 目前挑戰：第 <span className="text-blue-600 text-3xl">{currentLevel}</span> 關
+                  </h2>
+                  <p className="text-gray-500 text-sm mt-1">
+                    溫馨提醒：請誠實寫出程式碼，讓小人走到終點後，再點擊右邊的過關按鈕喔！
+                  </p>
+                </div>
+                
+                <button 
+                  onClick={handleLevelComplete}
+                  disabled={isSaving}
+                  className={`flex items-center gap-2 font-bold py-3 px-6 rounded-xl text-lg shadow-md transform transition ${
+                    isSaving 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-green-500 hover:bg-green-600 text-white hover:scale-105 animate-pulse'
+                  }`}
+                >
+                  {isSaving ? '資料存檔中 ⏳' : (currentLevel < 10 ? '✅ 我過關了！進入下一關' : '🌟 完成第10關！結束挑戰')}
+                </button>
+              </div>
+
+              {/* 嵌入 Blockly 遊戲畫面 */}
+              <div className="flex-grow w-full bg-white rounded-2xl shadow-lg overflow-hidden border-4 border-blue-200 relative min-h-[600px]">
+                 <iframe 
+                    src={`https://blockly.games/maze?lang=zh-hant&level=${currentLevel}&skin=0`} 
+                    title="Blockly Maze"
+                    className="absolute inset-0 w-full h-full border-0"
+                 ></iframe>
+              </div>
+            </div>
+          )}
+
+          {/* 破關完成畫面 */}
+          {gameState === 'finished' && (
+            <div className="flex-grow flex items-center justify-center p-4 w-full">
+              <div className="bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border-4 border-yellow-400">
+                <div className="text-8xl mb-6 animate-bounce">🎊</div>
+                <h2 className="text-4xl font-black text-red-500 mb-4 tracking-wider">太厲害了！</h2>
+                <p className="text-xl text-gray-700 mb-6">
+                  恭喜 <strong>{student.name}</strong> 突破了所有迷宮！<br/>
+                  你的邏輯超級棒！
+                </p>
+                <div className="bg-yellow-100 rounded-2xl p-6 mb-8 border-2 border-yellow-300">
+                  <span className="block text-gray-600 text-lg mb-2">最終得分</span>
+                  <span className="text-6xl font-black text-yellow-600 drop-shadow-sm">{score}</span>
+                </div>
+                <p className="text-green-600 font-bold text-lg">
+                  ✅ 你的成績已經自動送到老師的電腦裡囉！可以安心關閉網頁了。
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 將 React 元件渲染到畫面上
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
